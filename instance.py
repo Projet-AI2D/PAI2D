@@ -1,33 +1,23 @@
 import numpy as np
 import copy
+from gurobipy import *
 
 import sys
 import os
-from gurobipy import *
-
-
 preflib_path = "/users/Etu8/21233538/.local/lib/python3.11/site-packages"
 if os.path.exists(preflib_path) and preflib_path not in sys.path:
     sys.path.insert(0, preflib_path)
     print(f"Chemin ajouté: {preflib_path}")
 
-# ===== ESSAIE L'IMPORT =====
 from preflibtools.instances import OrdinalInstance
 
-    
-
-
-#from preflibtools.instances import OrdinalInstance 
-#import matplotlib.pyplot as plt
-
+import matplotlib.pyplot as plt
 import networkx
 
 class Instance :
     def __init__ (self) :
         self.init = False 
     
-    # NUMBER ALTERNATIVES: 7
-    # NUMBER VOTERS: 153
     def lecture_fichier(self,nomfich):
         inst = OrdinalInstance() 
         inst.parse_file(nomfich) #lecture de l'instance dans le fichier
@@ -36,9 +26,9 @@ class Instance :
         self.nb_candidats = inst.num_alternatives    # nombre d'alternatives
         self.candidats =  inst.alternatives_name   # dictionnaire cle=indice , valeur = nom alternative
         
-        self.profil_preferences = {tuple(x[0] for x in k): v for k, v in inst.multiplicity.items()} #dictionnaire cle = classements et valeur = nombre d'apparition
+        profil_preferences = {tuple(x[0] for x in k): v for k, v in inst.multiplicity.items()} #dictionnaire cle = classements et valeur = nombre d'apparition
         self.init = True
-        self.comptage(self.profil_preferences)
+        self.comptage(profil_preferences)
 
     #a changer
     def comptage(self, profil) : 
@@ -67,30 +57,30 @@ class Instance :
                 score += self.matPref[j,i]
         return score
 
-    def est_propre(self,cand,l_propres,l_sales) : 
-        for i in self.candidats.keys() : 
-            if i != cand and self.matPref[i,cand] < (3/4)*self.nb_votants and self.matPref[cand,i] < (3/4)*self.nb_votants :
-                l_sales.append(cand)
-                return False
-        l_propres.append(cand)
-        return True
-
-    # def est_propre(self,cand) : 
-    #     l_avant = []
-    #     l_apres = []
-    #     propre = True
+    # def est_propre(self,cand,l_propres,l_sales) : 
     #     for i in self.candidats.keys() : 
-    #         if i == cand :
-    #             continue 
-    #         elif self.matPref[i,cand] >= (3/4)*self.nb_votants:
-    #             l_avant.append(i) 
-    #         elif self.matPref[cand,i] >= (3/4)*self.nb_votants :
-    #             l_apres.append(i) 
-    #         else :
-    #             propre = False 
-    #     if not propre :
-    #         return l_avant, l_apres, False
-    #     return l_avant, l_apres, True
+    #         if i != cand and self.matPref[i,cand] < (3/4)*self.nb_votants and self.matPref[cand,i] < (3/4)*self.nb_votants :
+    #             l_sales.append(cand)
+    #             return False
+    #     l_propres.append(cand)
+    #     return True
+
+    def est_propre(self,cand,candidats) : 
+        l_avant = []
+        l_apres = []
+        propre = True
+        for i in candidats : 
+            if i == cand :
+                continue 
+            elif self.matPref[i,cand] >= (3/4)*self.nb_votants:
+                l_avant.append(i) 
+            elif self.matPref[cand,i] >= (3/4)*self.nb_votants :
+                l_apres.append(i) 
+            else :
+                propre = False 
+        if not propre :
+            return l_avant, l_apres, False
+        return l_avant, l_apres, True
 
     class Graphe :
 
@@ -176,7 +166,7 @@ class Instance :
 
             return partition
                 
-
+        #a modif
         def afficher_graphe(self):
             fig, ax = plt.subplots(figsize=(10, 8)) #fenetre d'affichage
 
@@ -236,31 +226,33 @@ class Instance :
                 if self.matPref[i,j] < 0.5 * self.nb_votants :
                     self.Graphe.addVoisins(j,i)
 
-# def majority_trois_quarts_rec(inst, l_candidats, classement, essais = 0):
-#     if not l_candidats:
-#         return 
-#     # aucun propre après un tour complet
-#     if essais >= len(l_candidats):
-#         classement.append(l_candidats)  # tous les restants sont sales
-#         return
+def majority_trois_quarts_rec(inst, l_candidats, classement, essais=0):
+    if not l_candidats:
+        return 
     
-#     l_avant, l_apres, propre = inst.est_propre(l_candidats[0])
+    # aucun propre après un tour complet
+    if essais >= inst.nb_candidats:
+        classement.append(l_candidats)  # tous les restants sont sales
+        return
 
-#     if propre :
-#         majority_trois_quarts_rec(inst, l_avant,classement)
-#         classement.append([[l_candidats[0]]])
-#         majority_trois_quarts_rec(inst,l_apres,classement)
-#     else : 
-#         l_candidats.append(l_candidats.pop(0)) #placer le candidat sale à la fin
-#         majority_trois_quarts_rec(inst,l_candidats,classement)         
+    l_avant, l_apres, propre = inst.est_propre(l_candidats[0],l_candidats)
+
+    if propre :
+        majority_trois_quarts_rec(inst, l_avant,classement,essais+1)
+        classement.append([l_candidats.pop(0)])
+        majority_trois_quarts_rec(inst,l_apres,classement,essais+1)
+    else : 
+        l_candidats.append(l_candidats.pop(0)) #placer le candidat sale à la fin
+        majority_trois_quarts_rec(inst,l_candidats,classement,essais+1)         
 
 
-# def majority_trois_quart(inst):
-#     classement = []
+def majority_trois_quart(inst):
+    classement = []
+    majority_trois_quarts_rec(inst, list(inst.candidats.keys()),classement)
+    return classement
 
-#     majority_trois_quarts_rec(inst, list(inst.candidats.keys()),classement)
-       
-#     return classement
+
+
 # def majorite_trois_quart(inst):
 #     classement =  dict() #cle= position et val = candidat ou instance reduite
             
@@ -288,87 +280,36 @@ class Instance :
 #     return classement
 
 
-def majorite_trois_quart(inst):
+# def majorite_trois_quart(inst):
 
-    l_propres = [] #candidats propres
-    l_sales = []
-    for c in inst.candidats.keys() : 
-        inst.est_propre(c,l_propres,l_sales)
-
-
-    classpropre =np.zeros(len(l_propres),dtype=int)
-    for c1 in l_propres :
-        pos = len(l_propres)-1
-        for c2 in l_propres[l_propres.index(c1):] : 
-            if c1!= c2 :
-                if inst.matPref[c1,c2] > (3/4)*inst.nb_votants:
-                    pos -= 1
-        classpropre[pos] = c1
-
-    classementfinal = []
-    for i in range(len(classpropre)) :
-        tmp = set()
-        for c1 in l_sales :
-            if inst.matPref[c1,int(classpropre[i])] >= (3/4)*inst.nb_votants:
-                tmp.add(c1)
-        for c in tmp :
-            l_sales.remove(c)
-        if tmp :
-            classementfinal.append(tmp)
-        classementfinal.append(int(classpropre[i]))
-
-    return classementfinal
+#     l_propres = [] #candidats propres
+#     l_sales = []
+#     for c in inst.candidats.keys() : 
+#         inst.est_propre(c,l_propres,l_sales)
 
 
-#verifier init a chaque debut de fct !!!
+#     classpropre =np.zeros(len(l_propres),dtype=int)
+#     for c1 in l_propres :
+#         pos = len(l_propres)-1
+#         for c2 in l_propres[l_propres.index(c1):] : 
+#             if c1!= c2 :
+#                 if inst.matPref[c1,c2] > (3/4)*inst.nb_votants:
+#                     pos -= 1
+#         classpropre[pos] = c1
 
+#     classementfinal = []
+#     for i in range(len(classpropre)) :
+#         tmp = set()
+#         for c1 in l_sales :
+#             if inst.matPref[c1,int(classpropre[i])] >= (3/4)*inst.nb_votants:
+#                 tmp.add(c1)
+#         for c in tmp :
+#             l_sales.remove(c)
+#         if tmp :
+#             classementfinal.append(tmp)
+#         classementfinal.append(int(classpropre[i]))
 
-            
-
-# classm = majority_trois_quart(i)
-# print(classm)
-
-def majority_trois_quarts_rec(inst, l_candidats, classement, essais=0):
-    if not l_candidats:
-        return 
-    
-    # aucun propre après un tour complet
-    if essais >= inst.nb_candidats:
-        classement.append(l_candidats)  # tous les restants sont sales
-        return
-
-    l_avant, l_apres, propre = inst.est_propre(l_candidats[0],l_candidats)
-
-    if propre :
-        majority_trois_quarts_rec(inst, l_avant,classement,essais+1)
-        classement.append([l_candidats.pop(0)])
-        majority_trois_quarts_rec(inst,l_apres,classement,essais+1)
-    else : 
-        l_candidats.append(l_candidats.pop(0)) #placer le candidat sale à la fin
-        majority_trois_quarts_rec(inst,l_candidats,classement,essais+1)         
-
-
-def majority_trois_quart(inst):
-    classement = []
-    majority_trois_quarts_rec(inst, list(inst.candidats.keys()),classement)
-    return classement
-
-    def est_propre(self,cand,candidats) : 
-        l_avant = []
-        l_apres = []
-        propre = True
-        for i in candidats : 
-            if i == cand :
-                continue 
-            elif self.matPref[i,cand] >= (3/4)*self.nb_votants:
-                l_avant.append(i) 
-            elif self.matPref[cand,i] >= (3/4)*self.nb_votants :
-                l_apres.append(i) 
-            else :
-                propre = False 
-        if not propre :
-            return l_avant, l_apres, False
-        return l_avant, l_apres, True
+#     return classementfinal
 
 
 def resolution_pl(inst) : 
@@ -429,18 +370,11 @@ def resolution_pl(inst) :
             position[int(v.VarName[2])] = position.get(int(v.VarName[2]), 0) + int(v.X)
 
         print(position)
-            
-
-            
-  
-
-
                 
         print('\nValeur de la fonction objectif :', m.objVal)
 
-    
 
-
+#verifier init a chaque debut de fct !!!
 
 
 i = Instance()
@@ -458,8 +392,8 @@ i.lecture_fichier("test.soc")
 #print(i.Graphe.__str__())
 #print(i.Graphe.get_CFC())
 #i.Graphe.afficher_graphe()
-#classement = majorite_trois_quart(i)
-#print(classement)
+# classement = majorite_trois_quart(i)
+# print(classement)
 # for cle in sorted(classement):
 #     if type(classement[cle]) == int :
 #         print(classement[cle], " > ", end='')
@@ -468,4 +402,8 @@ i.lecture_fichier("test.soc")
 #         for c in classement[cle].candidats.keys():
 #             print(c, " , ", end='')
 #         print(" } > ", end='')
+            
+
+classm = majority_trois_quart(i)
+
 resolution_pl(i)

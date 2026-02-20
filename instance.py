@@ -1,6 +1,6 @@
 import numpy as np
 import copy
-from gurobipy import *
+#from gurobipy import *
 
 import sys
 import os
@@ -12,7 +12,7 @@ if os.path.exists(preflib_path) and preflib_path not in sys.path:
 from preflibtools.instances import OrdinalInstance
 
 import matplotlib.pyplot as plt
-import networkx
+import networkx as nx
 
 class Instance :
     def __init__ (self) :
@@ -43,29 +43,15 @@ class Instance :
                     else : 
                         self.matPref[j,i] += nbpref        
 
+    def est_propre1(self,cand,l_propres,l_sales) : 
+        for i in self.candidats.keys() : 
+            if i != cand and self.matPref[i,cand] < (3/4)*self.nb_votants and self.matPref[cand,i] < (3/4)*self.nb_votants :
+                l_sales.append(cand)
+                return False
+        l_propres.append(cand)
+        return True
 
-    #somme des dist de Kendall Tau
-    def score_Kemeny(self, classement) : 
-        if not self.init :
-            print("Initialisez l'instance avec lecture_fichier")
-            return -1
-        score=0
-        # for pref, nbpref in self.profil_preferences.items() :
-        #     score +=  Kendall_Tau(pref, classement) * nbpref
-        for i in classement :
-            for j in classement[classement.index(i)+1:] :
-                score += self.matPref[j,i]
-        return score
-
-    # def est_propre(self,cand,l_propres,l_sales) : 
-    #     for i in self.candidats.keys() : 
-    #         if i != cand and self.matPref[i,cand] < (3/4)*self.nb_votants and self.matPref[cand,i] < (3/4)*self.nb_votants :
-    #             l_sales.append(cand)
-    #             return False
-    #     l_propres.append(cand)
-    #     return True
-
-    def est_propre(self,cand,candidats) : 
+    def est_propre2(self,cand,candidats) : 
         l_avant = []
         l_apres = []
         propre = True
@@ -122,7 +108,7 @@ class Instance :
         
 
         #algorithme de tarjan 
-        def get_CFC(self) : 
+        def condorcet_etendu(self) : 
             num = 0
             pile = []
             partition = []
@@ -165,51 +151,22 @@ class Instance :
                     DFS_recursif(n)
 
             return partition
-                
-        #a modif
+
+
         def afficher_graphe(self):
-            fig, ax = plt.subplots(figsize=(10, 8)) #fenetre d'affichage
+            G = nx.DiGraph() #graphe orienté 
+            G.add_nodes_from(self.noeuds) #ajout des noeuds
 
-            # 1. Positionner les noeuds sur un cercle 
-            n = len(self.noeuds)
-            positions = {}
-            for i, noeud in enumerate(self.noeuds):
-                angle = 2 * np.pi * i / n
-                positions[noeud] = (np.cos(angle), np.sin(angle))
-
-            # 2. Dessiner les NOEUDS
-            for noeud, (x, y) in positions.items():
-                # noeud
-                c = plt.Circle((x, y), 0.1,color='lightblue')
-                ax.add_patch(c)
-                # Texte
-                ax.text(x, y, str(noeud),
-                    ha='center', va='center',
-                    fontsize=12, fontweight='bold')
-
-            # 3. Dessiner les ARCS 
-            for source in self.noeuds:
-                for cible in self.voisins.get(source, []):
-                    x1, y1 = positions[source]
-                    x2, y2 = positions[cible]
-                    
-                    # Flèche
-                    ax.arrow(x1, y1, 
-                            x2-x1, y2-y1,
-                            head_width=0.03, 
-                            head_length=0.05,
-                            fc='gray', 
-                            ec='gray',
-                            length_includes_head=True,
-                            alpha=0.7)
-
-           
+            for source,voisins in self.voisins.items():
+                for v in voisins :
+                    G.add_edge(source,v)
             
-            # 4. Ajuster l'affichage
-            ax.set_aspect('equal')  # Garde les proportions
-            ax.axis('off')  # Cache les axes
-    
+            plt.figure(figsize=(8, 6))
+            pos = nx.spring_layout(G)
+
+            nx.draw(G,pos,with_labels=True,node_color='lightblue',node_size=500)
             plt.show()
+                
 
     #a changer
     def construction_graphe_majorite(self):
@@ -226,20 +183,27 @@ class Instance :
                 if self.matPref[i,j] < 0.5 * self.nb_votants :
                     self.Graphe.addVoisins(j,i)
 
+        
 def majority_trois_quarts_rec(inst, l_candidats, classement, essais=0):
     if not l_candidats:
         return 
     
     # aucun propre après un tour complet
     if essais >= inst.nb_candidats:
-        classement.append(l_candidats)  # tous les restants sont sales
+        nv_inst = Instance()
+        nv_inst.nb_votants = inst.nb_votants 
+        nv_inst.nb_candidats = len(l_candidats)
+        nv_inst.candidats = {k: inst.candidats[k] for k in l_candidats}
+        nv_inst.matPref = copy.deepcopy(inst.matPref)
+        nv_inst.init = True
+        classement.append(nv_inst)  # tous les restants sont sales
         return
 
-    l_avant, l_apres, propre = inst.est_propre(l_candidats[0],l_candidats)
+    l_avant, l_apres, propre = inst.est_propre2(l_candidats[0],l_candidats)
 
     if propre :
         majority_trois_quarts_rec(inst, l_avant,classement,essais+1)
-        classement.append([l_candidats.pop(0)])
+        classement.append(l_candidats.pop(0))
         majority_trois_quarts_rec(inst,l_apres,classement,essais+1)
     else : 
         l_candidats.append(l_candidats.pop(0)) #placer le candidat sale à la fin
@@ -251,65 +215,98 @@ def majority_trois_quart(inst):
     majority_trois_quarts_rec(inst, list(inst.candidats.keys()),classement)
     return classement
 
+def majorite_trois_quart(inst):
+
+    l_propres = [] #candidats propres
+    l_sales = []
+    for c in inst.candidats.keys() : 
+        inst.est_propre1(c,l_propres,l_sales)
 
 
-# def majorite_trois_quart(inst):
-#     classement =  dict() #cle= position et val = candidat ou instance reduite
-            
-#     for c in inst.candidats.keys():
-#         if c not in [val for _,val in classement.items()]:
-#             propre, l_avant, l_apres, paires_sales = inst.est_propre(c)
+    classpropre =np.zeros(len(l_propres),dtype=int)
+    for c1 in l_propres :
+        pos = len(l_propres)-1
+        for c2 in l_propres[l_propres.index(c1):] : 
+            if c1!= c2 :
+                if inst.matPref[c1,c2] > (3/4)*inst.nb_votants:
+                    pos -= 1
+        classpropre[pos] = c1
 
-#             if propre :
-#                 classement[len(l_avant)] = c #si propre -> 1 seul elt sinon plrs
-#             else : 
-#                 nv_inst = Instance()
-#                 nv_inst.nb_votants = inst.nb_votants 
-#                 nv_inst.nb_candidats = len(paires_sales)
+    classementfinal = []
+    for i in range(len(classpropre)) :
+        tmp = set()
+        for c1 in l_sales :
+            if inst.matPref[c1,int(classpropre[i])] >= (3/4)*inst.nb_votants:
+                tmp.add(c1)
+        for c in tmp :
+            l_sales.remove(c)
+        if tmp :
+            nv_inst = Instance()
+            nv_inst.nb_votants = inst.nb_votants 
+            nv_inst.nb_candidats = len(tmp)
+            nv_inst.candidats = {k: inst.candidats[k] for k in tmp}
+            nv_inst.matPref = copy.deepcopy(inst.matPref)
+            nv_inst.init = True
+            classementfinal.append(nv_inst)
+        classementfinal.append(int(classpropre[i]))
 
-#                 nv_inst.candidats = {k: inst.candidats[k] for k in paires_sales}
-
-#                 nv_inst.matPref = copy.deepcopy(inst.matPref)
-
-#                 nv_inst.init = True
-
-#                 #on peut garder lui si on ne l'utilise nul part a part pour creer la matrice qui ne change pas ?
-#                 nv_inst.profil_preferences = copy.deepcopy(inst.profil_preferences)
-
-#                 classement[len(l_avant)] = nv_inst
-#     return classement
-
-
-# def majorite_trois_quart(inst):
-
-#     l_propres = [] #candidats propres
-#     l_sales = []
-#     for c in inst.candidats.keys() : 
-#         inst.est_propre(c,l_propres,l_sales)
+    return classementfinal
 
 
-#     classpropre =np.zeros(len(l_propres),dtype=int)
-#     for c1 in l_propres :
-#         pos = len(l_propres)-1
-#         for c2 in l_propres[l_propres.index(c1):] : 
-#             if c1!= c2 :
-#                 if inst.matPref[c1,c2] > (3/4)*inst.nb_votants:
-#                     pos -= 1
-#         classpropre[pos] = c1
+def condorcet_etendu(inst) : 
+    num = 0
+    pile = []
+    partition = []
 
-#     classementfinal = []
-#     for i in range(len(classpropre)) :
-#         tmp = set()
-#         for c1 in l_sales :
-#             if inst.matPref[c1,int(classpropre[i])] >= (3/4)*inst.nb_votants:
-#                 tmp.add(c1)
-#         for c in tmp :
-#             l_sales.remove(c)
-#         if tmp :
-#             classementfinal.append(tmp)
-#         classementfinal.append(int(classpropre[i]))
+    numAccessible = {}
+    numero = {}
 
-#     return classementfinal
+    def DFS_recursif(sommetInit):
+        nonlocal num, pile, partition,numAccessible,numero  # Déclare que num vient de la fonction parente
+        pile.append(sommetInit) #noeud + lowlink
+        numAccessible[sommetInit] = num
+        numero[sommetInit] = num
+        num += 1 
+
+        for voisin in inst.Graphe.getVoisins(sommetInit) : 
+            print("v : ",voisin, " de : ", sommetInit)
+            if voisin not in numero:
+                DFS_recursif(voisin)
+                numAccessible[sommetInit] = min(numAccessible[sommetInit],numAccessible[voisin])
+                
+            elif voisin in pile:
+                #print("if")
+                numAccessible[sommetInit] = min(numAccessible[sommetInit],numero[voisin])
+                
+        # print(pile)
+        #print(lowlink)
+        if numAccessible[sommetInit] == numero[sommetInit] : 
+            cfc = set()
+            w = pile.pop()
+            while w != sommetInit :
+                print(w)
+                cfc.add(w)
+                w = pile.pop()
+            cfc.add(w)
+
+            if len(cfc) > 1 :
+                nv_inst = Instance()
+                nv_inst.nb_votants = inst.nb_votants 
+                nv_inst.nb_candidats = len(cfc)
+                nv_inst.candidats = {k: inst.candidats[k] for k in cfc}
+                nv_inst.matPref = copy.deepcopy(inst.matPref)
+                nv_inst.init = True
+
+                partition.insert(0,nv_inst) #inserer l'instance en tête 
+            else :
+                partition.insert(0,cfc.pop())  
+    
+    for n in inst.Graphe.noeuds : 
+        if n not in numAccessible.keys(): #si le noeud n'est dans aucune cfc (noeud isolé par exemple)
+            DFS_recursif(n)
+
+    return partition
+
 
 
 def resolution_pl(inst) : 
@@ -374,12 +371,37 @@ def resolution_pl(inst) :
         print('\nValeur de la fonction objectif :', m.objVal)
 
 
-#verifier init a chaque debut de fct !!!
+#somme des dist de Kendall Tau
+def score_Kemeny(matPref, classement) : 
+    # if not self.init :
+    #     print("Initialisez l'instance avec lecture_fichier")
+    #     return -1
+    score=0
+    for i in classement :
+        for j in classement[classement.index(i)+1:] :
+            score += matPref[j,i]
+    return score
+
+
+def resolution_dyn(inst):
+
+    def dyn_rec(l_candidats,matPref,):
+        n = len(l_candidats)
+        if n == 1 :
+            return l_candidats[0],0 #candidat,score
+        
+        
+        
+
+
+
+#verifier init a chaque debut de fct !!! 
+#ajouter fct affichage d'instance
 
 
 i = Instance()
-#i.lecture_fichier("00009-00000002.soc")
-i.lecture_fichier("test.soc")
+i.lecture_fichier("00009-00000002.soc")
+#i.lecture_fichier("test.soc")
 #i.lecture_fichier("majority.soc")
 # print(i.candidats)
 # print(i.nb_candidats)
@@ -388,10 +410,10 @@ i.lecture_fichier("test.soc")
 # print(i.score_Kemeny((1,3,2)))
 # for c in range(1,i.nb_candidats+1):
 #     print(c,i.est_propre(c))
-#i.construction_graphe_majorite()
-#print(i.Graphe.__str__())
-#print(i.Graphe.get_CFC())
-#i.Graphe.afficher_graphe()
+i.construction_graphe_majorite()
+print(i.Graphe.__str__())
+print(condorcet_etendu(i))
+
 # classement = majorite_trois_quart(i)
 # print(classement)
 # for cle in sorted(classement):
@@ -405,5 +427,6 @@ i.lecture_fichier("test.soc")
             
 
 classm = majority_trois_quart(i)
-
-resolution_pl(i)
+print(classm)
+i.Graphe.afficher_graphe()
+#resolution_pl(i)

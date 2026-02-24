@@ -1,13 +1,11 @@
 import numpy as np
 import copy
-#from gurobipy import *
+from gurobipy import *
+from itertools import combinations
+import time 
 
-import sys
-import os
-preflib_path = "/users/Etu8/21233538/.local/lib/python3.11/site-packages"
-if os.path.exists(preflib_path) and preflib_path not in sys.path:
-    sys.path.insert(0, preflib_path)
-    print(f"Chemin ajouté: {preflib_path}")
+
+
 
 from preflibtools.instances import OrdinalInstance
 
@@ -17,6 +15,7 @@ import networkx as nx
 class Instance :
     def __init__ (self) :
         self.init = False 
+        self.graphe = None
     
     def lecture_fichier(self,nomfich):
         inst = OrdinalInstance() 
@@ -30,10 +29,11 @@ class Instance :
         self.init = True
         self.comptage(profil_preferences)
 
-    #a changer
+    
     def comptage(self, profil) : 
-        #si on garde pas le profil de preference on doit refaire ca ici : profil = {tuple(x[0] for x in k): v for k, v in inst.multiplicity.items()} 
-        
+        if not self.init :
+            raise Exception("Initialisez l'instance avec lecture_fichier")
+
         self.matPref = np.zeros((self.nb_candidats+1,self.nb_candidats+1)) #matPref[i,j] = nb de votants qui preferent i à j, la premiere ligne et premiere colonnes sont vides pr avoir les bon indices
         for pref, nbpref in profil.items() :
             for i in range(1,self.nb_candidats+1) : 
@@ -43,7 +43,11 @@ class Instance :
                     else : 
                         self.matPref[j,i] += nbpref        
 
-    def est_propre1(self,cand,l_propres,l_sales) : 
+
+    def est_propre1(self,cand,l_propres,l_sales) :
+        if not self.init :
+            raise Exception("Initialisez l'instance avec lecture_fichier")
+
         for i in self.candidats.keys() : 
             if i != cand and self.matPref[i,cand] < (3/4)*self.nb_votants and self.matPref[cand,i] < (3/4)*self.nb_votants :
                 l_sales.append(cand)
@@ -51,7 +55,10 @@ class Instance :
         l_propres.append(cand)
         return True
 
-    def est_propre2(self,cand,candidats) : 
+    def est_propre2(self,cand,candidats) :
+        if not self.init :
+            raise Exception("Initialisez l'instance avec lecture_fichier")
+
         l_avant = []
         l_apres = []
         propre = True
@@ -105,53 +112,6 @@ class Instance :
         def getVoisins(self,cand):#recuperer les voisins    
             return self.voisins.get(cand,[]) #[] valeur par defaut
             
-        
-
-        #algorithme de tarjan 
-        def condorcet_etendu(self) : 
-            num = 0
-            pile = []
-            partition = []
-
-            numAccessible = {}
-            numero = {}
-
-            def DFS_recursif(sommetInit):
-                nonlocal num, pile, partition,numAccessible,numero  # Déclare que num vient de la fonction parente
-                pile.append(sommetInit) #noeud + lowlink
-                numAccessible[sommetInit] = num
-                numero[sommetInit] = num
-                num += 1 
-
-                for voisin in self.getVoisins(sommetInit) : 
-                    print("v : ",voisin, " de : ", sommetInit)
-                    if voisin not in numero:
-                        DFS_recursif(voisin)
-                        numAccessible[sommetInit] = min(numAccessible[sommetInit],numAccessible[voisin])
-                        
-                    elif voisin in pile:
-                        #print("if")
-                        numAccessible[sommetInit] = min(numAccessible[sommetInit],numero[voisin])
-                        
-                # print(pile)
-                #print(lowlink)
-                if numAccessible[sommetInit] == numero[sommetInit] : 
-                    cfc = set()
-                    w = pile.pop()
-                    while w != sommetInit :
-                        print(w)
-                        cfc.add(w)
-                        w = pile.pop()
-                    cfc.add(w)
-                    partition.append(cfc)
-           
-
-            for n in self.noeuds : 
-                if n not in numAccessible.keys(): #si le noeud n'est dans aucune cfc (noeud isolé par exemple)
-                    DFS_recursif(n)
-
-            return partition
-
 
         def afficher_graphe(self):
             G = nx.DiGraph() #graphe orienté 
@@ -168,20 +128,23 @@ class Instance :
             plt.show()
                 
 
-    #a changer
     def construction_graphe_majorite(self):
-        self.Graphe = self.Graphe()
+        if not self.init :
+            raise Exception("Initialisez l'instance avec lecture_fichier")
+
+        self.graphe = self.Graphe()
+        candidats = list(self.candidats.keys())
 
         # un candidat = un noeud
-        for i in range(1,self.nb_candidats+1):
-            self.Graphe.addNoeud(i)
+        for i in candidats:
+            self.graphe.addNoeud(i)
 
-        for i in range(1,self.nb_candidats +1): 
-            for j in range(i+1,self.nb_candidats +1): 
-                if self.matPref[i,j] > 0.5 * self.nb_votants :
-                    self.Graphe.addVoisins(i,j)
-                if self.matPref[i,j] < 0.5 * self.nb_votants :
-                    self.Graphe.addVoisins(j,i)
+        for i in range(self.nb_candidats): 
+            for j in range(i+1,self.nb_candidats): 
+                if self.matPref[candidats[i],candidats[j]] > 0.5 * self.nb_votants :
+                    self.graphe.addVoisins(candidats[i],candidats[j])
+                if self.matPref[candidats[i],candidats[j]] < 0.5 * self.nb_votants :
+                    self.graphe.addVoisins(candidats[j],candidats[i])
 
         
 def majority_trois_quarts_rec(inst, l_candidats, classement, essais=0):
@@ -214,6 +177,7 @@ def majority_trois_quart(inst):
     classement = []
     majority_trois_quarts_rec(inst, list(inst.candidats.keys()),classement)
     return classement
+
 
 def majorite_trois_quart(inst):
 
@@ -254,6 +218,9 @@ def majorite_trois_quart(inst):
 
 
 def condorcet_etendu(inst) : 
+    if inst.graphe is None:
+        inst.construction_graphe_majorite()
+
     num = 0
     pile = []
     partition = []
@@ -262,29 +229,24 @@ def condorcet_etendu(inst) :
     numero = {}
 
     def DFS_recursif(sommetInit):
-        nonlocal num, pile, partition,numAccessible,numero  # Déclare que num vient de la fonction parente
+        nonlocal num, pile, partition,numAccessible,numero  # Déclare que ces variables viennent de la fonction parente
         pile.append(sommetInit) #noeud + lowlink
-        numAccessible[sommetInit] = num
-        numero[sommetInit] = num
+        numAccessible[sommetInit] = num #place du sommet accessible le plus bas dans la pile
+        numero[sommetInit] = num #place dans la pile
         num += 1 
 
-        for voisin in inst.Graphe.getVoisins(sommetInit) : 
-            print("v : ",voisin, " de : ", sommetInit)
+        for voisin in inst.graphe.getVoisins(sommetInit) : 
             if voisin not in numero:
                 DFS_recursif(voisin)
                 numAccessible[sommetInit] = min(numAccessible[sommetInit],numAccessible[voisin])
                 
             elif voisin in pile:
-                #print("if")
                 numAccessible[sommetInit] = min(numAccessible[sommetInit],numero[voisin])
                 
-        # print(pile)
-        #print(lowlink)
         if numAccessible[sommetInit] == numero[sommetInit] : 
             cfc = set()
             w = pile.pop()
             while w != sommetInit :
-                print(w)
                 cfc.add(w)
                 w = pile.pop()
             cfc.add(w)
@@ -301,7 +263,7 @@ def condorcet_etendu(inst) :
             else :
                 partition.insert(0,cfc.pop())  
     
-    for n in inst.Graphe.noeuds : 
+    for n in inst.graphe.noeuds : 
         if n not in numAccessible.keys(): #si le noeud n'est dans aucune cfc (noeud isolé par exemple)
             DFS_recursif(n)
 
@@ -310,18 +272,17 @@ def condorcet_etendu(inst) :
 
 
 def resolution_pl(inst) : 
-    nbvar = inst.nb_candidats * (inst.nb_candidats - 1 )
-    colonnes = range(nbvar)
 
     m = Model("Kemeny")
 
     # declaration variables de decision
     x = []
-    for i in range(inst.nb_candidats):
+    candidats = list(inst.candidats.keys())
+    for i in candidats:
         tmp = []
-        for j in range(inst.nb_candidats):
+        for j in candidats:
             if i!=j :
-                tmp.append(m.addVar(vtype=GRB.BINARY, name="x%d%d" %(i+1,j+1)))
+                tmp.append(m.addVar(vtype=GRB.BINARY, name="x%d%d" %(i,j)))
         x.append(tmp) 
 
     #maj du modele pour integrer les nouvelles variables
@@ -348,7 +309,7 @@ def resolution_pl(inst) :
 
     for i in range(inst.nb_candidats):    
         for j in range(i+1,inst.nb_candidats):
-            obj += x[j][i]*poids[i+1][j+1]  + x[i][j-1]*poids[j+1][i+1] 
+            obj += x[j][i]*poids[candidats[i]][candidats[j]]  + x[i][j-1]*poids[candidats[j]][candidats[i]]
 
     # definition de l'objectif
     m.setObjective(obj,GRB.MINIMIZE)
@@ -356,26 +317,28 @@ def resolution_pl(inst) :
     # Resolution du programme linéaire
     m.optimize()
 
-
     # Affichage de la solution 
-    if m.status == GRB.OPTIMAL:
-        print('\nSolution optimale:')
+    #if m.status == GRB.OPTIMAL:               
+        #print('\nValeur de la fonction objectif :', m.objVal)
+    
+    return m 
+
+def reconstruction_classement_PL(modele,inst):
+    if modele.status == GRB.OPTIMAL:
         position = dict()
-        for v in m.getVars():
-            print(f"{v.VarName} {v.X:g}") #:g pour avoir des int
+        classement = np.zeros(inst.nb_candidats, dtype=int)
+        for v in modele.getVars():
+            #print(f"{v.VarName} {v.X:g}") #:g pour avoir des int
+            position[int(v.VarName[2:])] = position.get(int(v.VarName[2:]), 0) + int(v.X)
 
-            position[int(v.VarName[2])] = position.get(int(v.VarName[2]), 0) + int(v.X)
-
-        print(position)
-                
-        print('\nValeur de la fonction objectif :', m.objVal)
-
+        for v in modele.getVars():
+            classement[position[int(v.VarName[2:])]] = int(v.VarName[2:])
+        return list(classement)
+    raise Exception ("Il n'existe pas de solution")
+        
 
 #somme des dist de Kendall Tau
 def score_Kemeny(matPref, classement) : 
-    # if not self.init :
-    #     print("Initialisez l'instance avec lecture_fichier")
-    #     return -1
     score=0
     for i in classement :
         for j in classement[classement.index(i)+1:] :
@@ -384,49 +347,142 @@ def score_Kemeny(matPref, classement) :
 
 
 def resolution_dyn(inst):
+    
+    c_opti = dict() #key = ensemble candidat ordonné dans l'ordre croissant de leur numero
+                    #valeur = (candidat en tête, score)
+    
+    for t in range(1,inst.nb_candidats+1): #taille sous-ensemble
+        for c in combinations(sorted(inst.candidats.keys()),t): #combinaison possible 
+            print("candidats : ",c)
+            if t == 1 :
+                c_opti[c] = (c[0],0)
+            else : 
+                score_min = np.inf
+                cand_en_tete = c[0]
+                for cand in c : #on test chaque candidat en tête 
 
-    def dyn_rec(l_candidats,matPref,):
-        n = len(l_candidats)
-        if n == 1 :
-            return l_candidats[0],0 #candidat,score
-        
-        
-        
+                    reste = tuple(x for x in c if x != cand)
+                    score_reste = c_opti[reste][1]
+                    cout_cand = cout(cand,reste,inst.matPref)
 
+                    if score_min > score_reste + cout_cand : 
+                        score_min = score_reste + cout_cand 
+                        cand_en_tete = cand
+
+                c_opti[c] = (cand_en_tete,int(score_min))
+            
+    return c_opti
+
+def reconstruction_classement_PDyn(c_opti,inst):
+    classement = []
+    #tous les candidats triés dans l'ordre croissant de leur numero
+    c = tuple(sorted(inst.candidats.keys())) 
+    for t in range(inst.nb_candidats):
+        classement.append(c_opti[c][0])
+        c = tuple(x for x in c if x != c_opti[c][0])
+    
+    return classement
+
+#cout de placer cand en tête de l_candidats
+def cout(cand , l_candidats, matPref):
+    somme = 0
+    for c in l_candidats : 
+        somme += matPref[c,cand] #cout de placer cand avant c 
+    return somme
+
+def resolution(inst, fct_resolution, fct_reconstruction, reduction1=None, reduction2=None) : 
+    
+    inst_reduite = []
+    temps = 0
+
+    if reduction1 is not None :
+        start = time.process_time()
+        
+        red1 = reduction1(inst)
+        
+        end = time.process_time()
+        temps += end - start
+
+        if reduction2 is not None : #combiner 3/4 et condorcet
+            for i in red1 : 
+                if type(i) == Instance:
+                    start = time.process_time()
+                    
+                    red2 = reduction2(i)
+                    
+                    end = time.process_time()
+                    temps += end - start
+                    
+                    inst_reduite += red2
+                else : 
+                    inst_reduite.append(i)
+        else : 
+            inst_reduite = red1
+                
+
+    else :
+        inst_reduite.append(inst)
+
+    classement = []
+    for i in inst_reduite:
+        if type(i) == Instance:
+            start = time.process_time()
+            
+            res = fct_resolution(i)
+            
+            end = time.process_time()
+            temps += end - start
+            
+            classement += fct_reconstruction(res,i)
+        else : 
+            classement.append(i)        
+
+    return temps, classement
 
 
 #verifier init a chaque debut de fct !!! 
 #ajouter fct affichage d'instance
+#on doit tous reverifier pour que les numero soit associe au bon cand 
+# car on est pati du principe que c'etait des entier !!
 
 
-i = Instance()
-i.lecture_fichier("00009-00000002.soc")
-#i.lecture_fichier("test.soc")
-#i.lecture_fichier("majority.soc")
-# print(i.candidats)
-# print(i.nb_candidats)
-# print(i.nb_votants)
-# print(i.profil_preferences)
-# print(i.score_Kemeny((1,3,2)))
-# for c in range(1,i.nb_candidats+1):
-#     print(c,i.est_propre(c))
-i.construction_graphe_majorite()
-print(i.Graphe.__str__())
-print(condorcet_etendu(i))
+# i = Instance()
+# #i.lecture_fichier("00009-00000002.soc")
+# #i.lecture_fichier("test.soc")
+# i.lecture_fichier("majority.soc")
+# # print(i.candidats)
+# # print(i.nb_candidats)
+# # print(i.nb_votants)
+# # print(i.profil_preferences)
+# # print(i.score_Kemeny((1,3,2)))
+# # for c in range(1,i.nb_candidats+1):
+# #     print(c,i.est_propre(c))
+# i.construction_graphe_majorite()
+# # print(i.graphe.__str__())
 
-# classement = majorite_trois_quart(i)
-# print(classement)
-# for cle in sorted(classement):
-#     if type(classement[cle]) == int :
-#         print(classement[cle], " > ", end='')
-#     else : 
-#         print(" { ", end='')
-#         for c in classement[cle].candidats.keys():
-#             print(c, " , ", end='')
-#         print(" } > ", end='')
-            
 
-classm = majority_trois_quart(i)
-print(classm)
-i.Graphe.afficher_graphe()
-#resolution_pl(i)
+# # classement = majorite_trois_quart(i)
+# # print(classement)
+# # for cle in sorted(classement):
+# #     if type(classement[cle]) == int :
+# #         print(classement[cle], " > ", end='')
+# #     else : 
+# #         print(" { ", end='')
+# #         for c in classement[cle].candidats.keys():
+# #             print(c, " , ", end='')
+# #         print(" } > ", end='')
+# classmCondorcet = condorcet_etendu(i)        
+# print(classmCondorcet)
+# classm = majority_trois_quart(i)
+# print(classm)
+# #print(score_Kemeny(i.matPref,classmCondorcet))
+# # i.graphe.afficher_graphe()
+# m = resolution_pl(i)
+# print(np.array2string(reconstruction_classement_PL(m,i), separator=' > '))
+# #print( " recPL : ",reconstruction_classement_PL(m,i))
+# classmdyn = resolution_dyn(i)
+# #print(np.array2string(reconstruction_classement_PDyn(classmdyn,i), separator=' > '))
+# print( " recPDyn : ",reconstruction_classement_PDyn(classmdyn,i))
+# # print(classmdyn)
+# # print(score_Kemeny(i.matPref,classmdyn))
+

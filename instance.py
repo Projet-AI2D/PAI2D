@@ -16,8 +16,11 @@ class Instance :
     def __init__ (self) :
         self.init = False 
         self.graphe = None
+        self.matPef = None
     
     def lecture_fichier(self,nomfich):
+        if self.init : #deja initialisé
+            return 
         inst = OrdinalInstance() 
         inst.parse_file(nomfich) #lecture de l'instance dans le fichier
 
@@ -34,6 +37,9 @@ class Instance :
         if not self.init :
             raise Exception("Initialisez l'instance avec lecture_fichier")
 
+        if self.matPef is not None : 
+            return
+
         self.matPref = np.zeros((self.nb_candidats+1,self.nb_candidats+1)) #matPref[i,j] = nb de votants qui preferent i à j, la premiere ligne et premiere colonnes sont vides pr avoir les bon indices
         for pref, nbpref in profil.items() :
             for i in range(1,self.nb_candidats+1) : 
@@ -43,17 +49,6 @@ class Instance :
                     else : 
                         self.matPref[j,i] += nbpref        
 
-
-    def est_propre1(self,cand,l_propres,l_sales) :
-        if not self.init :
-            raise Exception("Initialisez l'instance avec lecture_fichier")
-
-        for i in self.candidats.keys() : 
-            if i != cand and self.matPref[i,cand] < (3/4)*self.nb_votants and self.matPref[cand,i] < (3/4)*self.nb_votants :
-                l_sales.append(cand)
-                return False
-        l_propres.append(cand)
-        return True
 
     def est_propre2(self,cand,candidats) :
         if not self.init :
@@ -177,44 +172,6 @@ def majority_trois_quart(inst):
     classement = []
     majority_trois_quarts_rec(inst, list(inst.candidats.keys()),classement)
     return classement
-
-
-def majorite_trois_quart(inst):
-
-    l_propres = [] #candidats propres
-    l_sales = []
-    for c in inst.candidats.keys() : 
-        inst.est_propre1(c,l_propres,l_sales)
-
-
-    classpropre =np.zeros(len(l_propres),dtype=int)
-    for c1 in l_propres :
-        pos = len(l_propres)-1
-        for c2 in l_propres[l_propres.index(c1):] : 
-            if c1!= c2 :
-                if inst.matPref[c1,c2] > (3/4)*inst.nb_votants:
-                    pos -= 1
-        classpropre[pos] = c1
-
-    classementfinal = []
-    for i in range(len(classpropre)) :
-        tmp = set()
-        for c1 in l_sales :
-            if inst.matPref[c1,int(classpropre[i])] >= (3/4)*inst.nb_votants:
-                tmp.add(c1)
-        for c in tmp :
-            l_sales.remove(c)
-        if tmp :
-            nv_inst = Instance()
-            nv_inst.nb_votants = inst.nb_votants 
-            nv_inst.nb_candidats = len(tmp)
-            nv_inst.candidats = {k: inst.candidats[k] for k in tmp}
-            nv_inst.matPref = copy.deepcopy(inst.matPref)
-            nv_inst.init = True
-            classementfinal.append(nv_inst)
-        classementfinal.append(int(classpropre[i]))
-
-    return classementfinal
 
 
 def condorcet_etendu(inst) : 
@@ -447,7 +404,7 @@ def resolution(inst, fct_resolution, fct_reconstruction, reduction1=None, reduct
 
 
 # i = Instance()
-# #i.lecture_fichier("00009-00000002.soc")
+# i.lecture_fichier("datasets/00011 - web/00011-00000003.soc")
 # #i.lecture_fichier("test.soc")
 # i.lecture_fichier("majority.soc")
 # # print(i.candidats)
@@ -461,7 +418,7 @@ def resolution(inst, fct_resolution, fct_reconstruction, reduction1=None, reduct
 # # print(i.graphe.__str__())
 
 
-# # classement = majorite_trois_quart(i)
+#classement = majorite_trois_quart(i)
 # # print(classement)
 # # for cle in sorted(classement):
 # #     if type(classement[cle]) == int :
@@ -473,7 +430,7 @@ def resolution(inst, fct_resolution, fct_reconstruction, reduction1=None, reduct
 # #         print(" } > ", end='')
 # classmCondorcet = condorcet_etendu(i)        
 # print(classmCondorcet)
-# classm = majority_trois_quart(i)
+#classm = majority_trois_quart(i)
 # print(classm)
 # #print(score_Kemeny(i.matPref,classmCondorcet))
 # # i.graphe.afficher_graphe()
@@ -486,3 +443,5 @@ def resolution(inst, fct_resolution, fct_reconstruction, reduction1=None, reduct
 # # print(classmdyn)
 # # print(score_Kemeny(i.matPref,classmdyn))
 
+# print(classement)
+# print(classm)

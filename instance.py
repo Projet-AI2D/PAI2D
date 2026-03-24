@@ -4,9 +4,6 @@ from gurobipy import *
 from itertools import combinations
 import time 
 
-
-
-
 from preflibtools.instances import OrdinalInstance
 
 import matplotlib.pyplot as plt
@@ -101,8 +98,6 @@ class Instance :
             
             if cand2 not in self.voisins[cand1]:
                 self.voisins[cand1].append(cand2)
-
-            #ajouter la marge sur les arcs?
 
         def getVoisins(self,cand):#recuperer les voisins    
             return self.voisins.get(cand,[]) #[] valeur par defaut

@@ -122,10 +122,10 @@ def eval_allFiles(dataset="00004 - netflix"):
             eval_reduction(chemin)
             print("fin eval reduction")
             #47 et 49 et 52 pas fini
-            #53
+
 #on a pas lancé le 00015 et le 41 et 43 et 44 et 48 et 50 et 51 et 54 et 55 et 56 (45 et 46 et 49 à lancer demain
 #enlever les fichiers dans spotifyday et relancer dessus
-eval_allFiles("00053 - f1races")
+eval_allFiles("00047 - spotifyday")
 
 # import pandas as pd
 

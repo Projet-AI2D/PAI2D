@@ -1,0 +1,19 @@
+# FILE NAME: exemple.soc
+# TITLE: Exemple 1 - Préférences de vote
+# DESCRIPTION: Instance avec 6 candidats et 8 votants
+# DATA TYPE: soc
+# MODIFICATION TYPE: original
+# NUMBER ALTERNATIVES: 6
+# NUMBER VOTERS: 8
+# NUMBER UNIQUE ORDERS: 5
+# ALTERNATIVE NAME 1: a
+# ALTERNATIVE NAME 2: b
+# ALTERNATIVE NAME 3: c
+# ALTERNATIVE NAME 4: d
+# ALTERNATIVE NAME 5: e
+# ALTERNATIVE NAME 6: f
+2: 1,3,6,5,4,2
+1: 1,3,5,6,4,2
+2: 1,4,3,6,5,2
+1: 1,2,4,3,6,5
+2: 1,2,6,5,4,3

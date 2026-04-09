@@ -36,9 +36,9 @@ class Instance :
     def __str__(self):
         return f"Instance({list(self.candidats.keys())})"
 
-    # On dit à Python d'utiliser le même affichage pour la représentation
-    def __repr__(self):
-        return self.__str__()
+    # pouvoir afficher l'instance dans le classement (liste)
+        def __repr__(self):
+            return self.__str__()
         
     def lecture_fichier(self,nomfich):
         """ 
@@ -50,7 +50,7 @@ class Instance :
         
             Sortie
             -------
-            aucune sortie
+            temps : temps de création de la matrice de preferences
         """
 
         if self.init : #deja initialisé
@@ -65,7 +65,13 @@ class Instance :
         
         profil_preferences = {tuple(x[0] for x in k): v for k, v in inst.multiplicity.items()} #dictionnaire cle = classements et valeur = nombre d'apparition
         self.init = True
+
+        start = time.process_time()
         self.comptage(profil_preferences) #création de la matrice de préférences
+        end = time.process_time()
+        temps = end - start #temps de création de la matrice de preferences
+
+        return temps
     
     def comptage(self, profil) : 
         """ 
@@ -220,8 +226,8 @@ class Instance :
                 if self.matPref[candidats[i],candidats[j]] < 0.5 * self.nb_votants :
                     self.graphe.addVoisins(candidats[j],candidats[i])
 
-        
-def majorite_trois_quarts_rec(inst, l_candidats, classement, essais=0):
+
+def majorite_trois_quarts_rec(inst, l_candidats,classement):
     """ 
         Algorithme récursif de classement basé sur la majorité des 3/4
     
@@ -233,44 +239,38 @@ def majorite_trois_quarts_rec(inst, l_candidats, classement, essais=0):
             liste des candiats restants 
         classement: liste
             classement en construction
-        essais: int 
-            nombre d'appel de la fonction. permet d'empecher les boucles infinies
-            Si essais >= inst.nb_candidats on a testé pour chaque candidat s'il est propre 
-                            
+
         Sortie
         -------
         aucune sortie
     """
-
-    if not l_candidats:
-        return 
+    i=0
+    while i < len(l_candidats):
+        l_avant, l_apres, propre = inst.est_propre(l_candidats[i],l_candidats)
+        if propre : 
+            majorite_trois_quarts_rec(inst, l_avant,classement)
+            classement.append(l_candidats.pop(i)) #ajout du candidat propre à la bonne position dans le classement et le supprimer des candidats restants
+            majorite_trois_quarts_rec(inst,l_apres,classement) 
+            return 
+        else :
+            i = i +1 
     
-    # aucun candidat propre après un tour complet
-    if essais >= inst.nb_candidats:
-        #création d'une sous-instance
-        nv_inst = Instance() 
-        nv_inst.nb_votants = inst.nb_votants 
+    #création d'une sous-instance
+    nv_inst = Instance() 
+    nv_inst.nb_votants = inst.nb_votants 
 
-        #uniquement les candidats restants
-        nv_inst.nb_candidats = len(l_candidats) 
-        nv_inst.candidats = {k: inst.candidats[k] for k in l_candidats}
+    #uniquement les candidats restants
+    nv_inst.nb_candidats = len(l_candidats) 
+    nv_inst.candidats = {k: inst.candidats[k] for k in l_candidats}
 
-        nv_inst.matPref = copy.deepcopy(inst.matPref) # matrice de préférences identiques
-        nv_inst.init = True
+    nv_inst.matPref = copy.deepcopy(inst.matPref) # matrice de préférences identiques
+    nv_inst.init = True
 
-        #ajout de l'instance à la bonne position dans le classement
-        classement.append(nv_inst)  # tous les restants sont des candidats non propres 
-        return
+    #ajout de l'instance à la bonne position dans le classement
+    classement.append(nv_inst)  # tous les restants sont des candidats non propres 
+    return
 
-    l_avant, l_apres, propre = inst.est_propre(l_candidats[0],l_candidats)  #on teste si le 1e candidat restant est propre
 
-    if propre : #si le 1e candidat est propre
-        majorite_trois_quarts_rec(inst, l_avant,classement,essais+1) #on applique la règle des 3/4 sur les candidats qui lui sont préférés
-        classement.append(l_candidats.pop(0)) #ajout du candidat propre à la bonne position dans le classement et le supprimer des candidats restants
-        majorite_trois_quarts_rec(inst,l_apres,classement,essais+1) #on applique la règle des 3/4 sur les candidats qui ne lui sont pas préférés
-    else : 
-        l_candidats.append(l_candidats.pop(0)) #placer le candidat non propre à la fin
-        majorite_trois_quarts_rec(inst,l_candidats,classement,essais+1) #et réappliquer la règle de majorité des 3/4 sur la "même" liste  
 
 def majorite_trois_quart(inst):
     """ 
@@ -693,3 +693,8 @@ if __name__ == "__main__":
     classement_Dyn = reconstruction_classement_PDyn(m,i)
     print(f'resolution par PDyn : {np.array2string(np.array(classement_Dyn), separator=" > ")} \n')
     print(f'score de Kemeny : {score_Kemeny(i.matPref,classement_Dyn)} \n')
+
+
+
+
+   

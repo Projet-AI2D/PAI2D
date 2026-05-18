@@ -661,12 +661,6 @@ def resolution(inst, fct_resolution, fct_reconstruction, reduction1=None, reduct
 
     return temps, classement
 
-
-#verifier init a chaque debut de fct !!! 
-#ajouter fct affichage d'instance
-#on doit tous reverifier pour que les numero soit associe au bon cand 
-# car on est pati du principe que c'etait des entier !!
-
 if __name__ == "__main__":
     i = Instance()
     i.lecture_fichier("exemple.soc")

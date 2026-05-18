@@ -3,9 +3,12 @@ import matplotlib.pyplot as plt
 import os
 import multiprocessing as mp
 import csv
+import pandas as pd
+import seaborn as sns
+from matplotlib.colors import LogNorm
 
 
-red = [instance.majority_trois_quart, instance.condorcet_etendu]
+red = [instance.majorite_trois_quart, instance.condorcet_etendu]
 res = [instance.resolution_dyn,instance.resolution_pl]
 rec = [instance.reconstruction_classement_PDyn,instance.reconstruction_classement_PL]
 
@@ -21,8 +24,7 @@ def run_with_timeout(func, args=(), timeout=600):
             
         Sortie
         -------
-        sortie de la fonction ou "TIMEOUT"
-            si la fonction est exécutée dans le temps impartie la sortie est identique à celle de la fonction executée
+            si la fonction est exécutée dans le temps imparti la sortie est identique à celle de la fonction executée
             sinon la sortie est "TIMEOUT"
     """
     pool = mp.Pool(processes=1) #creer un pool processus pour executer la fonction dans un processus séparé
@@ -35,25 +37,25 @@ def run_with_timeout(func, args=(), timeout=600):
         return "TIMEOUT"
 
 
-#fichier = "./datasets/00045 - tennis/00045-00000027.soc"
-
 def eval_temps(nomfich,fichDest="eval_temps.csv") : 
     """ Cette fonction permet de conserver les temps d'execution (avec une limite de temps : 45 min) dans un fichier.
         Elle commence par lire l'instance  puis appelle toutes les combinaisons de méthodes de décompostions et de résolutions
     
         Paramètres
         ----------
-        nonfich: nom du fichier qui contient l'instance à lire
-        fichDest: nom du fichier dans lequel on stocke les resultats 
+        nonfich: str
+            nom du fichier qui contient l'instance à lire
+        fichDest: str 
+            nom du fichier dans lequel on stocke les resultats 
             
         Sortie
         -------
-        aucune sortie
+        Sauvegarde les résultats dans le fichier fichDest
     """
     
     f = open(fichDest,'a')
     inst = instance.Instance()
-    inst.lecture_fichier(nomfich)
+    temps_matpref = inst.lecture_fichier(nomfich)
 
     f.write(os.path.basename(nomfich)+ ',') #ne garder que le nom du fichier et non tout le chemin
     f.write(str(inst.nb_candidats))
@@ -62,64 +64,43 @@ def eval_temps(nomfich,fichDest="eval_temps.csv") :
         for rd in red :
             #avec une reduction
             if res[rs]==instance.resolution_dyn and inst.nb_candidats > 100  : 
-                f.write(",TIMEOUT")
+                f.write(",2700")
             else : 
-                val = run_with_timeout(instance.resolution,args=(inst, res[rs], rec[rs], rd), timeout=2700)
-                if val == "TIMEOUT":
-                    f.write(",TIMEOUT")
+                val = run_with_timeout(instance.resolution,args=(inst, res[rs], rec[rs], rd), timeout=2700) #renvoie le couple (temps,classement)
+                if val == "2700":
+                    f.write(",2700")
                 else:
-                    f.write("," + str(val[0])) #notre fonction renvoie le couple (temps,classement)
-
-        #3/4 puis condorcet
-        if res[rs]==instance.resolution_dyn and inst.nb_candidats > 100  :
-            f.write(",TIMEOUT")
-        else :
-            val = run_with_timeout(instance.resolution,args=(inst, res[rs], rec[rs], red[0],red[1]), timeout=2700)
-            if val == "TIMEOUT":
-                f.write(",TIMEOUT")
-            else:
-                f.write("," + str(val[0]))
-            
-        #condorcet puis 3/4
-        if res[rs]==instance.resolution_dyn and inst.nb_candidats > 100  :
-            f.write(",TIMEOUT")
-        
-        else : 
-            val = run_with_timeout(instance.resolution,args=(inst, res[rs], rec[rs],red[1],red[0]), timeout=2700)
-            if val == "TIMEOUT":
-                f.write(",TIMEOUT")
-            else:
-                f.write("," + str(val[0]))
+                    f.write("," + str(temps_matpref+val[0])) #temps d'execution et de construction de la matrice
 
         #sans reduction 
-        if res[rs]==instance.resolution_dyn and inst.nb_candidats > 100  :
-            f.write(",TIMEOUT")
+        if res[rs]==instance.resolution_dyn and inst.nb_candidats > 100  : #pour plus de 100 candidats la PDyn est inefficace
+            f.write(",2700")
         else :
             val = run_with_timeout(instance.resolution,args=(inst, res[rs],rec[rs]), timeout=2700)
-            if val == "TIMEOUT":
-                f.write(",TIMEOUT")
+            if val == "2700":
+                f.write(",2700")
             else:
-                f.write("," + str(val[0]))
+                f.write("," + str(temps_matpref+val[0]))
 
     f.write('\n')
     
     f.close()
 
-#eval_temps("test.soc")
-# eval_temps(fichier)
 
-def eval_reduction(nomfich,fichDest="eval_reduction.csv"): 
+def eval_reduction(nomfich,fichDest): 
     """ Cette fonction permet de conserver les performances (la taille de la plus grande sous-instance et le nombre de candidat dont la position est connue après décomposition) dans un fichier.
         Elle commence par lire l'instance  puis appelle les méthodes de décompostions
     
         Paramètres
         ----------
-        nonfich: nom du fichier qui contient l'instance à lire
-        fichDest: nom du fichier dans lequel on stocke les performances 
+        nonfich: str
+            nom du fichier qui contient l'instance à lire
+        fichDest: str
+            nom du fichier dans lequel on stocke les performances 
             
         Sortie
         -------
-        aucune sortie
+        Sauvegarde les résultats dans le fichier fichDest
     """
     f = open(fichDest,'a')
      
@@ -146,31 +127,54 @@ def eval_reduction(nomfich,fichDest="eval_reduction.csv"):
     f.close()
 
 
+def reduction_allFiles(fichDest="eval_reduction.csv"):
+    """ Cette fonction permet d'appeler eval_reduction sur tous les fichiers du dataset.
+        
+        Paramètres
+            ----------
+            fichDest: str
+                nom du fichier dans lequel on stocke les performances 
+        
+        Sortie
+        -------
+        Sauvegarde les résultats dans le fichier fichDest
+        
+    """
 
-#eval_reduction(fichier)
-# os.remove(fichier)
+    f = open(fichDest,'a')
+    writer = csv.writer(f)
+    writer.writerow(['nomFichier','Nb_candidats','taille_max_3/4','Nb_candidats_fixes_3/4','taille_max_CCE','Nb_candidats_fixes_CCE'])
+    f.close()
+
+    root_dir = './datasets'
+
+    for root, dirs, files in os.walk(root_dir):
+        for filename in files:
+            # Créer le chemin complet
+            filepath = os.path.join(root, filename)
+            
+            # Lancer la fonction de réduction
+            print(f"Réduction de {filepath}")
+            eval_reduction(filepath,fichDest)
 
 
-def eval_allFiles(dataset="00004 - netflix"): 
-    """ Cette fonction permet d'appliquer les deux fonctions d'évaluation sur un dossier dataset (dossier avec plusieurs instances)
-    
+def temps_allFiles(dataset="00004 - netflix",fichDest='eval_temps.csv'): 
+    """ Cette fonction permet d'appliquer eval_temps sur tous les fichiers d'un dossier du dataset.
+
         Paramètres
         ----------
-        dataset: nom du dossier qui contient plusieurs instances (à évaluer)
+        dataset: str
+            nom du dossier qui contient plusieurs instances à évaluer
             
         Sortie
         -------
-        aucune sortie
+        Sauvegarde les résultats dans le fichier fichDest
     """
-    # f = open("eval_reduction.csv",'a')
-    # writer = csv.writer(f)
-    # writer.writerow(['nomFichier','Nb_candidats','taille_max_3/4','Nb_candidats_fixes_3/4','taille_max_CCE','Nb_candidats_fixes_CCE'])
-    # f.close()
-
-    # f = open("eval_temps.csv",'a')
-    # writer = csv.writer(f)
-    # writer.writerow(['nomFichier','Nb_candidats','3/4Maj+ProgDyn','CCE+ProgDyn','3/4Maj+CCE+ProgDyn','CCE+3/4Maj+ProgDyn','ProgDyn','3/4Maj+PL','CCE+PL','3/4Maj+CCE+PL','CCE+3/4Maj+PL','PL'])
-    # f.close()
+   
+    f = open(fichDest,'a')
+    writer = csv.writer(f)
+    writer.writerow(['nomFichier','Nb_candidats','3/4Maj+ProgDyn','CCE+ProgDyn','3/4Maj+CCE+ProgDyn','CCE+3/4Maj+ProgDyn','ProgDyn','3/4Maj+PL','CCE+PL','3/4Maj+CCE+PL','CCE+3/4Maj+PL','PL'])
+    f.close()
 
     # chemin du dossier
     dossier = os.path.join("./datasets", dataset)
@@ -179,34 +183,131 @@ def eval_allFiles(dataset="00004 - netflix"):
         chemin = os.path.join(dossier, fichier)  # chemin du fichier
         if os.path.isfile(chemin):
             eval_temps(chemin)
-            print("fin eval temps")
-            #eval_reduction(chemin)
-            print("fin eval reduction")
-            os.rename(chemin,os.path.join("./datasets", fichier))
-            #47 et 49 et 52 pas fini
+            
 
-#on a pas lancé le 00015 et le 41 et 43 et 44 et 48 et 50 et 51 et 54 et 55 et 56 (45 et 46 et 49 à lancer demain
-#enlever les fichiers dans spotifyday et relancer dessus
-eval_allFiles("00045 - tennis")
+def tracer_courbes_reduction(chemin_csv="eval_reduction.csv", fichDest="courbes_reduction_PrefLib.png"):
+    """Génère et sauvegarde les graphiques d'efficacité des règles de réduction.
+
+    Cette fonction agrège les données par la moyenne selon le nombre de
+    candidats initiaux, puis trace deux graphiques : la taille moyenne restante
+    de la plus grande sous-instance et le nombre moyen de candidats fixés.
+
+    Paramètres
+    ----------
+    chemin_csv : str
+        Chemin vers le fichier CSV contenant les résultats de l'évaluation.
+    fichDest : str
+        fichier image de sortie à sauvegarder.
+
+    Sortie
+    ------
+    Sauvegarde le graphique dans le fichier fichDest.
+    """
+        
+    df = pd.read_csv(chemin_csv)
+
+    # Agrégation par moyenne pour les deux graphiques
+    df_grouped = df.groupby("Nb_candidats")[
+        ["taille_max_3/4", "taille_max_CCE", "Nb_candidats_fixes_3/4", "Nb_candidats_fixes_CCE"]
+    ].mean().reset_index()
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Graphique 1 : candidats fixés 
+    ax1 = axes[0]
+    ax1.scatter(df_grouped["Nb_candidats"], df_grouped["Nb_candidats_fixes_3/4"],
+                s=12, alpha=0.7, label="3/4 majorité")
+    ax1.scatter(df_grouped["Nb_candidats"], df_grouped["Nb_candidats_fixes_CCE"],
+                s=12, alpha=0.7, label="Condorcet étendu")
+    ax1.set_title("Efficacité de la réduction :\ncandidats fixés")
+    ax1.set_xlabel("Nombre de candidats", fontsize=11)
+    ax1.set_ylabel("Nombre de candidats déjà fixés par la réduction", fontsize=11)
+    ax1.grid(True, linestyle="--", alpha=0.3)
+    ax1.legend(title="Algorithmes")
+
+    # Graphique 2 : taille moyenne 
+    ax2 = axes[1]
+    ax2.scatter(df_grouped["Nb_candidats"], df_grouped["taille_max_3/4"],
+                s=12, alpha=0.7, label="3/4 majorité")
+    ax2.scatter(df_grouped["Nb_candidats"], df_grouped["taille_max_CCE"],
+                s=12, alpha=0.7, label="Condorcet étendu")
+    ax2.set_title("Efficacité de la réduction :\ntaille moyenne de la plus grande sous instance")
+    ax2.set_xlabel("Nombre de candidats")
+    ax2.set_ylabel("Taille moyenne")
+    ax2.grid(True, linestyle="--", alpha=0.3)
+    ax2.legend(title="Algorithmes")
+
+    plt.tight_layout()
+    plt.savefig(fichDest)
+    plt.show()
+    
+
+def heatmapTemps(chemin_csv='eval_temps.csv'):
+    """Génère une heatmap des temps de résolution.
+
+        Cette fonction charge les données d'évaluation temporelle, regroupe le nombre
+        de candidats par tranches de tailles prédéfinies, calcule le temps médian
+        de calcul pour chaque algorithme, puis représente graphiquement ces performances
+        sur une échelle logarithmique.
+
+        Paramètres
+        ----------
+        chemin_csv : str
+            Chemin vers le fichier CSV contenant les résultats de l'évaluation.
+
+        Sortie
+        ------
+        Sauvegarde le graphique dans le fichier fichDest.
+        """
+
+    df = pd.read_csv(chemin_csv)
+
+    # Identification des colonnes
+    algos_bruts = [col for col in df.columns[2:] if not ("3/4" in col and "CCE" in col)]
+
+    # Dictionnaire pour renommer formellement
+    traduction = {
+        'ProgDyn': 'Prog. Dynamique seule',
+        '3/4Maj+ProgDyn': r'$\frac{3}{4}$-Majorité + Prog. Dyn.',
+        'CCE+ProgDyn': 'Condorcet étendu + Prog. Dyn.',
+        'PL': 'Prog. Linéaire seule',
+        '3/4Maj+PL': r'$\frac{3}{4}$-Majorité + Prog. Linéaire',
+        'CCE+PL': 'Condorcet étendu + Prog. Linéaire'
+    }
 
 
-# import pandas as pd
+    # Tranches
+    bins = [0, 9, 19, 29, 39, 49, 65, 75, 90, 100, 200, 300, 400]
+    labels = ['0-9', '10-19', '20-29', '30-39', '40-49', '50-65', '66-75', '76-90', '91-100', '101-200', '201-300', '301-400']
+    df['Tranche'] = pd.cut(df['Nb_candidats'], bins=bins, labels=labels)
+ 
+    # Médiane des temps, comptage et renommage
+    heatmap_data = df.groupby('Tranche', observed=False)[algos_bruts].median().T
+    counts = df['Tranche'].value_counts().reindex(labels).fillna(0).astype(int)
+    
+    # Format horizontal
+    heatmap_data.columns = [f"{lab} ({counts[lab]} inst.)" for lab in labels]
+    heatmap_data.index = [traduction.get(x, x) for x in heatmap_data.index]
 
-# def courbe(fichSource='eval_reduction.csv',fichDest='courbe_reduction.png',reduction = True):
-#     df = pd.read_csv(fichSource)
-#     #print(df)
-#     if reduction :
-#         type_colonne = ['taille_max_3/4','Nb_candidats_fixes_3/4','taille_max_CCE','Nb_candidats_fixes_CCE']
-#     else : 
-#         type_colonne = ['3/4Maj+ProgDyn','CCE+ProgDyn','3/4Maj+CCE+ProgDyn','CCE+3/4Maj+ProgDyn','3/4Maj+PL','CCE+PL','3/4Maj+CCE+PL','CCE+3/4Maj+PL','PL']
-
-#     res = df.groupby(['Nb_candidats'])[type_colonne].mean()
-#     print(res)
-#     res.plot(y=type_colonne,marker='*') #Nb_candidats est déja l'index pour x
-#     plt.savefig(fichDest)
-
-#     plt.show()
+    # # Dessin
+    plt.figure(figsize=(15, 8)) 
+    sns.heatmap(heatmap_data, annot=True, fmt=".2f", cmap="RdYlGn_r", 
+                norm=LogNorm(vmin=0.001, vmax=2700))
+    plt.xticks(rotation=30, ha='right') # Rotation pour la lisibilité
 
 
-# courbe() #par défaut courbe de reduction
-# courbe(fichSource='eval_temps.csv',fichDest='courbe_reduction.png',reduction=False)#courbe du temps en fonction de la taille de l'instance
+    plt.title("Analyse des performances : Temps médian de résolution (s)", fontsize=18, 
+            color='#2c3e50', # Gris anthracite, plus doux que le noir
+            pad=30, 
+            fontname='serif')
+    plt.xlabel("Nombre de candidats ($n$)", fontsize=12)
+    plt.ylabel("Méthodes de résolution", fontsize=12)
+
+    plt.tight_layout()
+    plt.savefig('eval_temps.png')
+    plt.show()
+
+
+if __name__ == "__main__":
+    #tracer_courbes_reduction()
+    heatmapTemps()

@@ -233,6 +233,7 @@ def majorite_trois_quarts_rec(inst, l_candidats,classement):
     
         Paramètres
         ----------
+        
         inst: object Instance
             l'instance du problème
         l_candidats: liste 
@@ -263,7 +264,7 @@ def majorite_trois_quarts_rec(inst, l_candidats,classement):
     nv_inst.nb_candidats = len(l_candidats) 
     nv_inst.candidats = {k: inst.candidats[k] for k in l_candidats}
 
-    nv_inst.matPref = copy.deepcopy(inst.matPref) # matrice de préférences identiques
+    nv_inst.matPref = inst.matPref # matrice de préférences identiques
     nv_inst.init = True
 
     #ajout de l'instance à la bonne position dans le classement
@@ -362,7 +363,7 @@ def condorcet_etendu(inst) :
                 nv_inst.nb_candidats = len(cfc)
                 nv_inst.candidats = {k: inst.candidats[k] for k in cfc}
 
-                nv_inst.matPref = copy.deepcopy(inst.matPref) # matrice de préférences identiques
+                nv_inst.matPref = inst.matPref # matrice de préférences identiques
                 nv_inst.init = True
 
                 #ajout de l'instance à la bonne position dans le classement

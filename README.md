@@ -26,11 +26,15 @@ de manière exacte et efficace, même sur des instances de grande taille.
 
 ## Dépendances 
 
-Toutes les bibliothèques nécessaires peuvent être installées via la commande : 
+Toutes les bibliothèques nécessaires peuvent être installées via les commandes : 
 
-``` pip install -r requirements.txt ```
+``` 
+pip install numpy matplotlib pandas seaborn networkx preflibtools
+pip install gurobipy 
+```
 
 Une licence Gurobi est nécessaire pour la programmation linéaire.
+
 
 ## Structure du projet
 
@@ -52,7 +56,11 @@ Il contient la méthode pour générer une instance à l'aide du modèle de Mall
 * *demo.ipynb* :  
 Ce notebook permet de tester nos fonctions les plus importantes sur la petite instance du fichier *exemple.soc* et sur une instance générée.
 
-Tous les résultats sont stockés dans des fichiers csv. 
+* dossier *results_plots* :
+Il contient toutes les représentations graphiques des performances.
+
+* dossier *results_csv* :
+Il contient tous les fichiers csv générés lors des évaluations.
 
 ## Références 
 

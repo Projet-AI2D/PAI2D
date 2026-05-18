@@ -63,7 +63,7 @@ def eval_temps(nomfich,fichDest="eval_temps.csv") :
     for rs in range(len(res)) : 
         for rd in red :
             #avec une reduction
-            if res[rs]==instance.resolution_dyn and inst.nb_candidats > 100  : 
+            if res[rs]==instance.resolution_dyn and inst.nb_candidats > 200  :  
                 f.write(",2700")
             else : 
                 val = run_with_timeout(instance.resolution,args=(inst, res[rs], rec[rs], rd), timeout=2700) #renvoie le couple (temps,classement)

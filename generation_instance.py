@@ -128,23 +128,20 @@ def eval_generation_PL_CCE():
     """
 
     n=1000 #nombre de votants    
-    l_thetas = [0.01]#[0.00001, 0.0001,0.001,0.01,0.1] #condorcet réduit suffisamment avec theta = 0.1
-    l_m = [300]#[50,100,200,300,400,500] #liste des valeurs testées pour m (maximum recursion depth exceeded pour n>994 pour la règle des 3/4 )
-    #finir avec 500
+    l_thetas = [0.00001, 0.0001,0.001,0.01,0.1] #condorcet réduit suffisamment avec theta = 0.1
+    l_m = [50,100,200,300,400,500] #liste des valeurs testées pour m (maximum recursion depth exceeded pour n>994 pour la règle des 3/4 )
     
-    # f = open("eval_generation_PL.csv",'a')
+    f = open("eval_generation_PL.csv",'a')
 
-    # writer = csv.writer(f)
-    # writer.writerow(['m','theta','temps_PL_sans_CCE','temps_PL_avec_CCE'])
+    writer = csv.writer(f)
+    writer.writerow(['m','theta','temps_PL_sans_CCE','temps_PL_avec_CCE'])
 
-    # f.close()
+    f.close()
 
     #on fait varier theta et m indépendamment 
     for m in l_m : 
         for theta in l_thetas : 
-            for i in range(2) : #tester avec plusieurs profils differents
-
-            #for i in range(50) : #tester avec plusieurs profils differents
+            for i in range(10) : #tester avec plusieurs profils differents
                 f = open("eval_generation_PL.csv",'a')
 
                 inst = generation_instance_mallows(n,m,theta) #generation d'une instance 
@@ -153,18 +150,19 @@ def eval_generation_PL_CCE():
 
                 print(m, i,'sans CCE')
                 val = eval.run_with_timeout(instance.resolution,args=(inst, instance.resolution_pl, instance.reconstruction_classement_PL), timeout=2700)
+                # val est un couple (temps,classement)
                 if val == "TIMEOUT":
-                    f.write(",TIMEOUT")
+                    f.write(",2700")
                 else:
-                    f.write("," + str(val[0])) #notre fonction renvoie le couple (temps,classement)
+                    f.write("," + str(val[0])) 
 
 
                 print(m, i,'avec CCE')
                 val = eval.run_with_timeout(instance.resolution,args=(inst, instance.resolution_pl, instance.reconstruction_classement_PL,instance.condorcet_etendu), timeout=2700)
                 if val == "TIMEOUT":
-                    f.write(",TIMEOUT")
+                    f.write(",2700")
                 else:
-                    f.write("," + str(val[0])) #notre fonction renvoie le couple (temps,classement)
+                    f.write("," + str(val[0]))
 
                 
                 f.write('\n')

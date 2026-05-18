@@ -49,8 +49,8 @@ Il contient les fichiers de code récupéré sur github ( [lien vers le dépôt 
 * *generation_instance* :
 Il contient la méthode pour générer une instance à l'aide du modèle de Mallows et les méthodes d'évaluation des décompositions et de la programmation linéaire sur les instance générées.
 
-* *projet.ipynb* :  
-Ce notebook permet de tester nos fonctions les plus importantes sur la petite instance du fichier *exemple.soc*
+* *demo.ipynb* :  
+Ce notebook permet de tester nos fonctions les plus importantes sur la petite instance du fichier *exemple.soc* et sur une instance générée.
 
 Tous les résultats sont stockés dans des fichiers csv. 
 

@@ -67,7 +67,7 @@ def eval_temps(nomfich,fichDest="eval_temps.csv") :
                 f.write(",2700")
             else : 
                 val = run_with_timeout(instance.resolution,args=(inst, res[rs], rec[rs], rd), timeout=2700) #renvoie le couple (temps,classement)
-                if val == "2700":
+                if val == "TIMEOUT":
                     f.write(",2700")
                 else:
                     f.write("," + str(temps_matpref+val[0])) #temps d'execution et de construction de la matrice
@@ -77,7 +77,7 @@ def eval_temps(nomfich,fichDest="eval_temps.csv") :
             f.write(",2700")
         else :
             val = run_with_timeout(instance.resolution,args=(inst, res[rs],rec[rs]), timeout=2700)
-            if val == "2700":
+            if val == "TIMEOUT":
                 f.write(",2700")
             else:
                 f.write("," + str(temps_matpref+val[0]))
@@ -289,17 +289,14 @@ def heatmapTemps(chemin_csv='eval_temps.csv'):
     heatmap_data.columns = [f"{lab} ({counts[lab]} inst.)" for lab in labels]
     heatmap_data.index = [traduction.get(x, x) for x in heatmap_data.index]
 
-    # # Dessin
+    # Dessin
     plt.figure(figsize=(15, 8)) 
     sns.heatmap(heatmap_data, annot=True, fmt=".2f", cmap="RdYlGn_r", 
                 norm=LogNorm(vmin=0.001, vmax=2700))
     plt.xticks(rotation=30, ha='right') # Rotation pour la lisibilité
 
 
-    plt.title("Analyse des performances : Temps médian de résolution (s)", fontsize=18, 
-            color='#2c3e50', # Gris anthracite, plus doux que le noir
-            pad=30, 
-            fontname='serif')
+    plt.title("Analyse des performances : Temps médian de résolution (s)", fontsize=18)
     plt.xlabel("Nombre de candidats ($n$)", fontsize=12)
     plt.ylabel("Méthodes de résolution", fontsize=12)
 
